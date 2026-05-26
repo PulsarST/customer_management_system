@@ -1,5 +1,15 @@
 package handlers
 
-func create_order(order map[string]int) {
+import (
+	"customer_managment_system/internal/handlers/db"
+
+	"github.com/gin-gonic/gin"
+)
+
+func CreateOrder(order_list []db.Orders) {
+	//jjdjlsdlklks
+}
+
+func GenerateJson(msg string) gin.H {
 
 }
