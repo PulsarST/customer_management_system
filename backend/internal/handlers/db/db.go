@@ -1,20 +1,14 @@
 package db
 
 import (
+	"customer_managment_system/internal/models"
+	"fmt"
 	"log"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
 )
-
-type Orders struct {
-	order_id        int
-	order_date      string
-	product_name    string
-	storage_address string
-	quantity        int
-	cost            float64
-}
 
 func ConnectMockup() *sqlx.DB {
 	db, err := sqlx.Connect("sqlite3", "../internal/handlers/db/mockup.db")
@@ -79,6 +73,36 @@ func GenerateMockUpData() {
 	if exec_err != nil {
 		log.Printf("Query failed: %v", exec_err)
 		log.Fatalln(exec_err)
+	}
+
+	db.Close()
+}
+
+func LoadOrderToDb(orders []models.Order) {
+	db := ConnectMockup()
+
+	for _, order := range orders {
+
+		query := fmt.Sprintf(
+			`INSERT INTO Orders (order_date, product_name, storage_address, quantity, cost)
+			VALUES ('%s', '%s', '%s', %d, %f);
+			`,
+			time.Now().Format("2006-01-02 15:04:05"),
+			order.Name,
+			order.Address,
+			order.Quantity,
+			order.Cost,
+		)
+
+		result, err := db.Exec(query)
+
+		if err != nil {
+			log.Println(err.Error())
+		}
+
+		rows, _ := result.RowsAffected()
+
+		log.Printf("LoadOrderToDb success, %d rows affected.", rows)
 	}
 
 	db.Close()
