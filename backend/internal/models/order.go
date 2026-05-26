@@ -1,8 +1,9 @@
 package models
 
 type Order struct {
-	Name     string  `db:name`
-	Address  string  `db:address`
-	Quantity int     `db:quantity`
-	Cost     float32 `db:cost`
+	Id       int     `db:"order_id"`
+	Name     string  `db:"product_name"`
+	Address  string  `db:"storage_address"`
+	Quantity int     `db:"quantity"`
+	Cost     float32 `db:"cost"`
 }

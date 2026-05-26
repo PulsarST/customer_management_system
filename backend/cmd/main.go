@@ -9,6 +9,9 @@ import (
 )
 
 func main() {
+	log.Println(db.GetProducts())
+	log.Println(db.GetStorages())
+	log.Println(db.GetStocks())
 	r := gin.Default()
 	if err := r.Run(); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
