@@ -6,7 +6,7 @@ func RegisterSiteRoutes(rg *gin.RouterGroup) {
 	database_routes := rg.Group("data")
 	{
 		database_routes.GET("/products")
-		database_routes.GET("/products")
-		database_routes.GET("/products")
+		database_routes.GET("/storage")
+		database_routes.GET("/stock")
 	}
 }
