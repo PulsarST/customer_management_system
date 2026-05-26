@@ -7,15 +7,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type Orders struct {
-	order_id        int
-	order_date      string
-	product_name    string
-	storage_address string
-	quantity        int
-	cost            float64
-}
-
 func ConnectMockup() *sqlx.DB {
 	db, err := sqlx.Connect("sqlite3", "../internal/handlers/db/mockup.db")
 	if err != nil {

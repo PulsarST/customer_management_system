@@ -1,8 +1,6 @@
 package routers
 
 import (
-	"customer_managment_system/internal/handlers"
-	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -18,12 +16,6 @@ func GetUserMessage(c gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": message,
 	})
-
-	_, err := handlers.CreateOrders(message)
-	if err != nil {
-		log.Fatalf(err.Error())
-	}
-
 }
 
 // asem/db/...
