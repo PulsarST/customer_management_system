@@ -1,24 +1,12 @@
 package routers
 
-import (
-	"net/http"
+import "github.com/gin-gonic/gin"
 
-	"github.com/gin-gonic/gin"
-)
-
-func start_message(c gin.Context) {
-
-}
-
-// chat/:msg
-func GetUserMessage(c gin.Context) {
-	message := c.Param("msg")
-	c.JSON(http.StatusOK, gin.H{
-		"message": message,
-	})
-}
-
-// asem/db/...
-func GetDbProducts(c gin.Context) {
-
+func RegisterSiteRoutes(rg *gin.RouterGroup) {
+	database_routes := rg.Group("data")
+	{
+		database_routes.GET("/products")
+		database_routes.GET("/products")
+		database_routes.GET("/products")
+	}
 }

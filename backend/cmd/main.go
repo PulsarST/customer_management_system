@@ -1,6 +1,7 @@
 package main
 
 import (
+	"customer_managment_system/internal/routers"
 	"log"
 	_ "net/http"
 
@@ -12,4 +13,6 @@ func main() {
 	if err := r.Run(); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}
+
+	routers.RegisterRoutes(r)
 }
