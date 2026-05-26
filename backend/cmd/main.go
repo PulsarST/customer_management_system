@@ -9,11 +9,10 @@ import (
 )
 
 func main() {
-
 	r := gin.Default()
+	routers.RegisterRoutes(r)
+
 	if err := r.Run(); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}
-
-	routers.RegisterRoutes(r)
 }
