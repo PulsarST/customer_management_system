@@ -2,9 +2,7 @@ package db
 
 import (
 	"customer_managment_system/internal/models"
-	"fmt"
 	"log"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3"
@@ -78,31 +76,16 @@ func GenerateMockUpData() {
 	db.Close()
 }
 
+const query string = `INSERT INTO Orders (order_date, product_name, storage_address, quantity, cost) 
+		VALUES (CURRENT_TIMESTAMP, :product_name, :storage_address, :quantity, :cost)`
+
 func LoadOrderToDb(orders []models.Order) {
 	db := ConnectMockup()
 
-	for _, order := range orders {
+	_, err := db.NamedExec(query, orders)
 
-		query := fmt.Sprintf(
-			`INSERT INTO Orders (order_date, product_name, storage_address, quantity, cost)
-			VALUES ('%s', '%s', '%s', %d, %f);
-			`,
-			time.Now().Format("2006-01-02 15:04:05"),
-			order.Name,
-			order.Address,
-			order.Quantity,
-			order.Cost,
-		)
-
-		result, err := db.Exec(query)
-
-		if err != nil {
-			log.Println(err.Error())
-		}
-
-		rows, _ := result.RowsAffected()
-
-		log.Printf("LoadOrderToDb success, %d rows affected.", rows)
+	if err != nil {
+		log.Println(err.Error())
 	}
 
 	db.Close()
