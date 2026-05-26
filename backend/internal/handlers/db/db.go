@@ -76,17 +76,63 @@ func GenerateMockUpData() {
 	db.Close()
 }
 
-const query string = `INSERT INTO Orders (order_date, product_name, storage_address, quantity, cost) 
-		VALUES (CURRENT_TIMESTAMP, :product_name, :storage_address, :quantity, :cost)`
-
 func LoadOrderToDb(orders []models.Order) {
 	db := ConnectMockup()
 
-	_, err := db.NamedExec(query, orders)
+	_, err := db.NamedExec(`INSERT INTO Orders (order_date, product_name, storage_address, quantity, cost) 
+		VALUES (CURRENT_TIMESTAMP, :product_name, :storage_address, :quantity, :cost)`, orders)
 
 	if err != nil {
 		log.Println(err.Error())
 	}
 
 	db.Close()
+}
+
+func GetProducts() []models.Product {
+	db := ConnectMockup()
+
+	var result []models.Product
+
+	err := db.Select(&result, `SELECT * FROM Products`)
+
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	db.Close()
+
+	return result
+}
+
+func GetStorages() []models.Storage {
+	db := ConnectMockup()
+
+	var result []models.Storage
+
+	err := db.Select(&result, `SELECT * FROM Storages`)
+
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	db.Close()
+
+	return result
+}
+
+func GetStocks() []models.Stock {
+	db := ConnectMockup()
+
+	var result []models.Stock
+
+	err := db.Select(&result, `SELECT * FROM Stock`)
+
+	if err != nil {
+		log.Println(err.Error())
+	}
+
+	db.Close()
+
+	return result
 }
