@@ -8,21 +8,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CreateOrder(ordersJson gin.H) {
+func CreateOrder(ordersJson gin.H) ([]models.Order, error) {
 	var orders []models.Order
 
 	bytes, err := json.Marshal(ordersJson["orders"])
 	if err != nil {
-		fmt.Println("Serialization error:", err)
-		return
+		fmt.Errorf("Serialization error:", err)
 	}
 
 	if err := json.Unmarshal(bytes, &orders); err != nil {
-		fmt.Println("Deserialization error:", err)
-		return
+		fmt.Errorf("Deserialization error:", err)
 	}
 
-	fmt.Printf("Successful holding orders: %d\n", len(orders))
+	return orders, nil
 }
 
 func GenerateJson(msg string) (gin.H, error) {
