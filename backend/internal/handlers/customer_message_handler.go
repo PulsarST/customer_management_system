@@ -1,14 +1,15 @@
 package handlers
 
 import (
-	"customer_managment_system/internal/models"
-	"fmt"
+	"customer_managment_system/internal/handlers/db"
+
+	"github.com/gin-gonic/gin"
 )
 
-func CreateOrders(msg string) ([]models.Order, error) {
-	return nil, fmt.Errorf("Cannot create slice of Orders")
+func CreateOrder(order_list []db.Orders) {
+	//jjdjlsdlklks
 }
 
-func LoadToDB(models []models.Order) {
+func GenerateJson(msg string) gin.H {
 
 }
