@@ -9,9 +9,9 @@ import (
 )
 
 func ConnectMockup() *sqlx.DB {
-	db, err := sqlx.Connect("sqlite3", "../internal/handlers/db/mockup.db")
+	db, err := sqlx.Connect("sqlite3", "internal/handlers/db/mockup.db")
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln("cannot prodide sql conntection: ", err)
 	}
 	return db
 }
@@ -70,7 +70,6 @@ func GenerateMockUpData() {
 	`)
 	if exec_err != nil {
 		log.Printf("Query failed: %v", exec_err)
-		log.Fatalln(exec_err)
 	}
 
 	db.Close()
