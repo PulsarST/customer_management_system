@@ -1,7 +1,10 @@
 package services
 
 import (
+	"customer_managment_system/internal/chat"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -23,12 +26,24 @@ func OnConnect(c *gin.Context) {
 	defer conn.Close()
 
 	for {
-		msgType, msg, err := conn.ReadMessage()
+		var incomingMessage chat.Message
+
+		err := conn.ReadJSON(&incomingMessage)
 		if err != nil {
+			log.Printf("Error reading JSON: %v", err)
 			return
 		}
 
-		if err := conn.WriteMessage(msgType, msg); err != nil {
+		serverMsg := chat.Message{
+			Timestamp:    time.Now(),
+			Message_type: chat.MESSAGE_TYPE_MESSAGE,
+			Content:      "hi !",
+			Sender:       "server",
+			Status:       200,
+		}
+
+		if err := conn.WriteJSON(serverMsg); err != nil {
+			log.Printf("Error writing JSON: %v", err)
 			return
 		}
 

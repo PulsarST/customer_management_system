@@ -10,11 +10,11 @@ const MESSAGE_TYPE_MESSAGE string = "wh_message"
 const MESSAGE_TYPE_REQUEST string = "wh_request"
 
 type Message struct {
-	Timestamp    time.Time
-	Message_type string
-	Content      string
-	Sender       string
-	Status       int
+	Timestamp    time.Time `json:"timestamp"`
+	Message_type string    `json:"messageType"`
+	Content      string    `json:"content"`
+	Sender       string    `json:"sender"`
+	Status       int       `json:"status"`
 }
 
 func MessageToJson(message Message) gin.H {
