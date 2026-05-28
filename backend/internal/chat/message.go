@@ -1,6 +1,8 @@
 package chat
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -8,11 +10,11 @@ const MESSAGE_TYPE_MESSAGE string = "wh_message"
 const MESSAGE_TYPE_REQUEST string = "wh_request"
 
 type Message struct {
-	Timestamp    string
-	Message_type string
-	Content      string
-	Sender       string
-	Status       int
+	Timestamp    time.Time `json:"timestamp"`
+	Message_type string    `json:"messageType"`
+	Content      string    `json:"content"`
+	Sender       string    `json:"sender"`
+	Status       int       `json:"status"`
 }
 
 func MessageToJson(message Message) gin.H {
@@ -28,7 +30,7 @@ func MessageToJson(message Message) gin.H {
 func JsonToMessage(json gin.H) Message {
 
 	return Message{
-		Timestamp:    json["timestamp"].(string),
+		Timestamp:    json["timestamp"].(time.Time),
 		Message_type: json["message_type"].(string),
 		Content:      json["content"].(string),
 		Sender:       json["sender"].(string),

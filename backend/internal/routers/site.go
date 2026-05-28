@@ -13,4 +13,9 @@ func RegisterSiteRoutes(rg *gin.RouterGroup) {
 		database_routes.GET("/storages", services.GetStorages)
 		database_routes.GET("/stocks", services.GetStocks)
 	}
+
+	websocket_routes := rg.Group("/ws")
+	{
+		websocket_routes.GET("/chat", services.OnConnect)
+	}
 }
