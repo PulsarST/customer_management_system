@@ -28,21 +28,25 @@ func OnConnect(c *gin.Context) {
 
 	ctx := context.Background()
 
+	client := ai.ConnectToAI(ctx)
+
 	for {
 		var incomingMessage chat.Message
 
 		err := conn.ReadJSON(&incomingMessage)
 		if err != nil {
-			log.Printf("Error reading JSON: %v", err)
+			log.Fatalf("Error reading JSON: %v", err.Error())
 			return
 		}
 
-		client := ai.ConnectToAI(ctx)
+		log.Printf("%v", incomingMessage)
 
 		serverMsg := ai.ParseToAI(incomingMessage, client, &ctx, c)
 
+		log.Printf("%v", serverMsg)
+
 		if err := conn.WriteJSON(serverMsg); err != nil {
-			log.Printf("Error writing JSON: %v", err)
+			log.Fatalf("Error writing JSON: %v", err.Error())
 			return
 		}
 

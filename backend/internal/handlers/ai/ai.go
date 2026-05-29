@@ -14,13 +14,13 @@ import (
 )
 
 type ParsedRequest struct {
-	Intent  string `json:"intent"`
-	Payload gin.H  `json:"payload"`
+	Intent  string                 `json:"intent"`
+	Payload map[string]interface{} `json:"payload"`
 }
 
 func ConnectToAI(ctx context.Context) *genai.Client {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: "ключ сюды",
+		APIKey: "AQ.Ab8RN6KTPybFvoiZcc2gSBdB1McRYYgSn4CYMazF-124PvgBbw",
 	})
 
 	if err != nil {
@@ -79,10 +79,10 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 		- user_submits_order. User is 100 percent sure about his last order.
 
 		Payload for each intent:
-			chat: a string containing a regular reply.
-			order_options: regular reply string, and a JSON with a list of orders. Order containing product id, product name, storage address, quantity and a total cost being price*quantity.
-			order: regular reply string, and a JSON with a list of orders.
-			user_submits_order: a string containing a regular reply, notifying user that the order was submitted.
+			chat: JSON with a string containing a regular reply.
+			order_options: JSON with a regular reply string, and a JSON with a list of orders. Order containing product id, product name, storage address, quantity and a total cost being price*quantity.
+			order: regular JSON with a reply string, and a JSON with a list of orders.
+			user_submits_order: JSON with a string containing a regular reply, notifying user that the order was submitted.
 
 		Rules:
 		- product must be in english
@@ -100,8 +100,8 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 		{
 			"intent":"order",
 			"payload":{
-				"Ваши товары были успешно найдены!",
-				[
+				"text": "Ваши товары были успешно найдены!",
+				"orders": [
 					{
 							"product_id": 1, 
 							"product_name": "Ноутбук Lenovo ThinkPad E14",
@@ -125,8 +125,8 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 		{
 			"intent":"order_options",
 			"payload":{
-				"",
-				[
+				"text": "",
+				"orders": [
 					{
 							"product_id": 14, 
 							"product_name": "Планшет iPad Air",
@@ -150,8 +150,8 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 		{
 			"intent":"order_options",
 			"payload":{
-				"Извините, но на данный момент ни в одном хранилище не было ручек. Попробуйте спросить в следующий раз.",
-				[]
+				"text": "Извините, но на данный момент ни в одном хранилище не было ручек. Попробуйте спросить в следующий раз.",
+				"orders": []
 			}
 		}
 
@@ -160,8 +160,8 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 		{
 			"intent":"order_options",
 			"payload":{
-				"К сожалению у нас нет звуковых девайсов с такой ценой. Однако может вас заинтересует это?",
-				[
+				"text": "К сожалению у нас нет звуковых девайсов с такой ценой. Однако может вас заинтересует это?",
+				"orders": [
 					{
 						"product_id": 11,
 						"product_name": "Наушники Sony WH-1000XM4", 
@@ -184,14 +184,14 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 		Response:
 		{
 			"intent":"chat",
-			"payload":"Здравствуйте, что хотите у нас заказать?"
+			"payload":{"text": "Здравствуйте, что хотите у нас заказать?"}
 		}
 
 		User: подверждаю заказ
 		Response:
 		{
 			"intent":"user_submits_order",
-			"payload":"Хорошо. Ваш последний заказ обрабатывается."
+			"payload":{"text": "Хорошо. Ваш последний заказ обрабатывается."}
 		}
 
 		Message:
@@ -205,7 +205,7 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 	)
 
 	if err != nil {
-		return chat.Message{Status: http.StatusServiceUnavailable}
+		return chat.Message{Status: http.StatusServiceUnavailable, Content: "503 SERVICE UNAVAILABLE: " + err.Error()}
 	}
 
 	jsonText := strings.TrimSpace(parseResult.Text())
@@ -218,15 +218,13 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 	err = json.Unmarshal([]byte(jsonText), &parsed)
 
 	if err != nil {
-		return chat.Message{Status: http.StatusInternalServerError}
+		return chat.Message{Status: http.StatusInternalServerError, Content: "500 INTERNAL SERVER ERROR: " + err.Error() + "\n FAULTY ASS JSON: " + jsonText}
 	}
-
-	parsed_json, _ := json.Marshal(parsed)
 
 	result_message := chat.Message{
 		Timestamp:    time.Now(),
 		Message_type: chat.MESSAGE_TYPE_MESSAGE,
-		Content:      string(parsed_json),
+		Content:      jsonText,
 		Sender:       "server",
 		Status:       http.StatusOK,
 	}
