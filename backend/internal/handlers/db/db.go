@@ -2,6 +2,7 @@ package db
 
 import (
 	"customer_managment_system/internal/models"
+	"encoding/json"
 	"log"
 
 	"github.com/jmoiron/sqlx"
@@ -134,4 +135,12 @@ func GetStocks() []models.Stock {
 	db.Close()
 
 	return result
+}
+
+func GetSchemaString() string {
+	products, _ := json.Marshal(GetProducts())
+	storages, _ := json.Marshal(GetStorages())
+	stocks, _ := json.Marshal(GetStocks())
+
+	return `Products: ` + string(products) + `\n Storages: ` + string(storages) + `\n Stock: ` + string(stocks)
 }

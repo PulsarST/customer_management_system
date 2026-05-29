@@ -1,10 +1,11 @@
 package services
 
 import (
+	"context"
 	"customer_managment_system/internal/chat"
+	"customer_managment_system/internal/handlers/ai"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -25,6 +26,8 @@ func OnConnect(c *gin.Context) {
 
 	defer conn.Close()
 
+	ctx := context.Background()
+
 	for {
 		var incomingMessage chat.Message
 
@@ -34,13 +37,9 @@ func OnConnect(c *gin.Context) {
 			return
 		}
 
-		serverMsg := chat.Message{
-			Timestamp:    time.Now(),
-			Message_type: chat.MESSAGE_TYPE_MESSAGE,
-			Content:      "hi !",
-			Sender:       "server",
-			Status:       200,
-		}
+		client := ai.ConnectToAI(ctx)
+
+		serverMsg := ai.ParseToAI(incomingMessage, client, &ctx, c)
 
 		if err := conn.WriteJSON(serverMsg); err != nil {
 			log.Printf("Error writing JSON: %v", err)
