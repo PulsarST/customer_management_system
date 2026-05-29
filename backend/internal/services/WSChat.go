@@ -37,7 +37,7 @@ func OnConnect(c *gin.Context) {
 		serverMsg := chat.Message{
 			Timestamp:    time.Now(),
 			Message_type: chat.MESSAGE_TYPE_MESSAGE,
-			Content:      "hi !",
+			Content:      "hi sender from server !",
 			Sender:       "server",
 			Status:       200,
 		}
