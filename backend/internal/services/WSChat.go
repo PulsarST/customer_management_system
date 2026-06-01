@@ -1,10 +1,11 @@
 package services
 
 import (
+	"context"
 	"customer_managment_system/internal/chat"
+	"customer_managment_system/internal/handlers/ai"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -25,25 +26,27 @@ func OnConnect(c *gin.Context) {
 
 	defer conn.Close()
 
+	ctx := context.Background()
+
+	client := ai.ConnectToAI(ctx)
+
 	for {
 		var incomingMessage chat.Message
 
 		err := conn.ReadJSON(&incomingMessage)
 		if err != nil {
-			log.Printf("Error reading JSON: %v", err)
+			log.Fatalf("Error reading JSON: %v", err.Error())
 			return
 		}
 
-		serverMsg := chat.Message{
-			Timestamp:    time.Now(),
-			Message_type: chat.MESSAGE_TYPE_MESSAGE,
-			Content:      "hi sender from server !",
-			Sender:       "server",
-			Status:       200,
-		}
+		log.Printf("%v", incomingMessage)
+
+		serverMsg := ai.ParseToAI(incomingMessage, client, &ctx, c)
+
+		log.Printf("%v", serverMsg)
 
 		if err := conn.WriteJSON(serverMsg); err != nil {
-			log.Printf("Error writing JSON: %v", err)
+			log.Fatalf("Error writing JSON: %v", err.Error())
 			return
 		}
 
