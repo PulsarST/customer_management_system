@@ -39,11 +39,7 @@ func OnConnect(c *gin.Context) {
 			return
 		}
 
-		log.Printf("%v", incomingMessage)
-
 		serverMsg := ai.ParseToAI(incomingMessage, client, &ctx, c)
-
-		log.Printf("%v", serverMsg)
 
 		if err := conn.WriteJSON(serverMsg); err != nil {
 			log.Fatalf("Error writing JSON: %v", err.Error())
