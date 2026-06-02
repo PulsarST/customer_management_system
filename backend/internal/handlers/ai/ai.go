@@ -8,11 +8,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/genai"
+	"github.com/joho/godotenv"
+	"github.com/sashabaranov/go-openai"
 )
 
 type ParsedRequest struct {
@@ -24,28 +26,52 @@ type ParsedRequest struct {
 type EmptyPayload struct{}
 
 type ProductsPayload struct {
-	Products []models.Product
+	Products []models.Product `json:"products"`
+}
+
+type JSONOrder struct {
+	ProductID      int     `json:"product_id"`
+	ProductName    string  `json:"product_name"`
+	Price          float32 `json:"price"`
+	StorageAddress string  `json:"storage_address"`
+	Quantity       int     `json:"quantity"`
 }
 
 type CartPayload struct {
-	Orders     []models.Order
-	total_cost float32
+	Orders    []JSONOrder `json:"cart"`
+	TotalCost float32     `json:"total_cost"`
 }
 
-func ConnectToAI(ctx context.Context) *genai.Client {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: "ключчч",
-	})
-
+func JSONOrderToModelsOrder(json_orders []JSONOrder) []models.Order {
+	var result []models.Order
+	for _, json_order := range json_orders {
+		result = append(
+			result,
+			models.Order{
+				Name:     json_order.ProductName,
+				Address:  json_order.StorageAddress,
+				Quantity: json_order.Quantity,
+				Cost:     float32(json_order.Quantity) * json_order.Price})
+	}
+	return result
+}
+func ConnectToAI(ctx context.Context) *openai.Client {
+	err := godotenv.Load()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
+	AI_TOKEN := os.Getenv("AI_TOKEN")
+
+	config := openai.DefaultConfig(AI_TOKEN)
+	config.BaseURL = "https://integrate.api.nvidia.com/v1"
+
+	client := openai.NewClientWithConfig(config)
 	return client
 }
 
-func processParseResult(parseResult *genai.GenerateContentResponse, session *chat.ChatSession) chat.Message {
-	jsonText := strings.TrimSpace(parseResult.Text())
+func processParseResult(parseResult string, session *chat.ChatSession) chat.Message {
+	jsonText := strings.TrimSpace(parseResult)
 
 	jsonText = strings.ReplaceAll(jsonText, "```json", "")
 	jsonText = strings.ReplaceAll(jsonText, "```", "")
@@ -58,6 +84,8 @@ func processParseResult(parseResult *genai.GenerateContentResponse, session *cha
 		return chat.Message{Status: http.StatusInternalServerError, Content: "500 INTERNAL SERVER ERROR: " + err.Error() + "\n FAULTY ASS JSON: " + jsonText}
 	}
 
+	log.Println("PARSEREQUEST: %v", parsed)
+
 	switch parsed.Intent {
 	case "chat":
 	case "products":
@@ -69,15 +97,19 @@ func processParseResult(parseResult *genai.GenerateContentResponse, session *cha
 			return chat.Message{Status: http.StatusInternalServerError, Content: "500 INTERNAL SERVER ERROR: " + err.Error() + "\n FAULTY ASS JSON: " + jsonText}
 		}
 
-		chat.UpdateOrderList(cart_payload.Orders, session)
+		log.Println("STRING PAYLOAD: %v", parsed.Payload)
+		log.Println("CART PAYLOAD: %v", cart_payload)
+
+		chat.UpdateOrderList(JSONOrderToModelsOrder(cart_payload.Orders), session)
 	case "submit":
 		db.LoadOrderToDb(session.OrdersCart)
+		chat.UpdateOrderList([]models.Order{}, session)
 	}
 
 	return chat.Message{Content: jsonText, Status: http.StatusOK}
 }
 
-func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context, c *gin.Context) chat.Message {
+func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context, c *gin.Context) chat.Message {
 
 	session := chat.GetSession(message.Sender)
 
@@ -165,24 +197,40 @@ func ParseToAI(message chat.Message, client *genai.Client, ctx *context.Context,
 			- Check if cart is not empty before switching to "submit" intent.
 
 		Message:
-	`
+	` + message.Content
 
 	chat.RememberMessage(message, session)
 
 	log.Printf("MESSAGES: %v\n", session.Messages)
 
-	parseResult, err := client.Models.GenerateContent(
-		*ctx,
-		"gemini-2.5-flash",
-		genai.Text(basePrompt+message.Content),
-		nil,
+	parsedResult, err := client.CreateChatCompletion(
+		context.Background(),
+		openai.ChatCompletionRequest{
+			Model: "qwen/qwen3-coder-480b-a35b-instruct",
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: basePrompt,
+				},
+			},
+			Temperature: 0.6,
+			TopP:        0.75,
+			MaxTokens:   8192,
+		},
 	)
+
+	// parseResult, err := client.Models.GenerateContent(
+	// 	*ctx,
+	// 	"gemini-2.5-flash",
+	// 	genai.Text(basePrompt+message.Content),
+	// 	nil,
+	// )
 
 	if err != nil {
 		return chat.Message{Status: http.StatusServiceUnavailable, Content: "503 SERVICE UNAVAILABLE: " + err.Error()}
 	}
 
-	result := processParseResult(parseResult, session)
+	result := processParseResult(parsedResult.Choices[0].Message.Content, session)
 	if result.Status != http.StatusOK {
 		return result
 	}
