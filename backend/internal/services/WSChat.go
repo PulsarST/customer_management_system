@@ -35,16 +35,25 @@ func OnConnect(c *gin.Context) {
 
 		err := conn.ReadJSON(&incomingMessage)
 		if err != nil {
-			log.Fatalf("Error reading JSON: %v", err.Error())
+			if websocket.IsCloseError(err,
+				websocket.CloseNormalClosure,    // Код 1000: нормальное закрытие
+				websocket.CloseGoingAway,        // Код 1001: клиент закрыл вкладку/обновил страницу
+				websocket.CloseNoStatusReceived, // Код 1005: закрыто без статуса
+			) {
+				log.Printf("Клиент отключился (onclose).")
+			} else {
+				log.Printf("Ошибка чтения JSON или обрыв связи: %v", err)
+			}
+
 			return
 		}
 
 		serverMsg := ai.ParseToAI(incomingMessage, client, &ctx, c)
 
 		if err := conn.WriteJSON(serverMsg); err != nil {
-			log.Fatalf("Error writing JSON: %v", err.Error())
+			log.Printf("Ошибка записи JSON: %v", err)
 			return
 		}
-
 	}
+
 }

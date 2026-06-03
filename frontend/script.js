@@ -33,7 +33,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
             }
             socket.onerror = (err) => console.error("Socket error:", err);
-            socket.onclose = () => console.log("Chat connection closed.");
+            socket.onclose = () => {
+                console.log("Chat connection closed.");
+                socket.close();
+            }
         }
 
         chatWindow.style.display = "flex";
