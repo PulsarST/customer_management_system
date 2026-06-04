@@ -70,6 +70,29 @@ func ConnectToAI(ctx context.Context) *openai.Client {
 	return client
 }
 
+func processPayload(parsed *ParsedRequest, session *chat.ChatSession) error {
+	switch parsed.Intent {
+	case "chat":
+	case "products":
+	case "cart":
+		var cart_payload CartPayload
+		err := json.Unmarshal([]byte(parsed.Payload), &cart_payload)
+
+		if err != nil {
+			return err
+		}
+
+		log.Println("STRING PAYLOAD: %v", parsed.Payload)
+		log.Println("CART PAYLOAD: %v", cart_payload)
+
+		chat.UpdateOrderList(JSONOrderToModelsOrder(cart_payload.Orders), session)
+	case "submit":
+		db.LoadOrderToDb(session.OrdersCart)
+		chat.UpdateOrderList([]models.Order{}, session)
+	}
+	return nil
+}
+
 func processParseResult(parseResult string, session *chat.ChatSession) chat.Message {
 	jsonText := strings.TrimSpace(parseResult)
 
@@ -86,24 +109,9 @@ func processParseResult(parseResult string, session *chat.ChatSession) chat.Mess
 
 	log.Println("PARSEREQUEST: %v", parsed)
 
-	switch parsed.Intent {
-	case "chat":
-	case "products":
-	case "cart":
-		var cart_payload CartPayload
-		err := json.Unmarshal([]byte(parsed.Payload), &cart_payload)
-
-		if err != nil {
-			return chat.Message{Status: http.StatusInternalServerError, Content: "500 INTERNAL SERVER ERROR: " + err.Error() + "\n FAULTY ASS JSON: " + jsonText}
-		}
-
-		log.Println("STRING PAYLOAD: %v", parsed.Payload)
-		log.Println("CART PAYLOAD: %v", cart_payload)
-
-		chat.UpdateOrderList(JSONOrderToModelsOrder(cart_payload.Orders), session)
-	case "submit":
-		db.LoadOrderToDb(session.OrdersCart)
-		chat.UpdateOrderList([]models.Order{}, session)
+	err = processPayload(&parsed, session)
+	if err != nil {
+		return chat.Message{Status: http.StatusInternalServerError, Content: "500 INTERNAL SERVER ERROR: " + err.Error() + "\n FAULTY ASS JSON: " + jsonText}
 	}
 
 	return chat.Message{Content: jsonText, Status: http.StatusOK}
@@ -218,13 +226,6 @@ func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context
 			MaxTokens:   8192,
 		},
 	)
-
-	// parseResult, err := client.Models.GenerateContent(
-	// 	*ctx,
-	// 	"gemini-2.5-flash",
-	// 	genai.Text(basePrompt+message.Content),
-	// 	nil,
-	// )
 
 	if err != nil {
 		return chat.Message{Status: http.StatusServiceUnavailable, Content: "503 SERVICE UNAVAILABLE: " + err.Error()}
