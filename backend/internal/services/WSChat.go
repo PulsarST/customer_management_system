@@ -6,6 +6,7 @@ import (
 	"customer_managment_system/internal/handlers/ai"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -47,6 +48,8 @@ func OnConnect(c *gin.Context) {
 
 			return
 		}
+
+		incomingMessage.Timestamp = time.Now()
 
 		serverMsg := ai.ParseToAI(incomingMessage, client, &ctx, c)
 		// serverMsg := chat.Message{Content: "{\"intent\": \"cart\", \"text\": \"YOOFDGODFOG\", \"payload\": \"{\\\"cart\\\": [{\\\"product_id\\\": 1, \\\"product_name\\\": \\\"sdfsdf\\\", \\\"price\\\": 123.32, \\\"storage_address\\\": \\\"dsfsdf\\\", \\\"quantity\\\": 4}], \\\"total_cost\\\": 54.34}\"}", Status: 200}

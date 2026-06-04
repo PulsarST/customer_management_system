@@ -240,7 +240,7 @@ func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context
 			},
 			Temperature: 0.3,
 			TopP:        0.75,
-			MaxTokens:   300,
+			MaxTokens:   400,
 			Stop:        []string{"```", "\n\n\n"},
 			ResponseFormat: &openai.ChatCompletionResponseFormat{
 				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
