@@ -27,7 +27,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 try {
                     const messageObject = JSON.parse(e.data);
-                    addMessage(messageObject["content"], "bot-message")       
+                    const textBot = JSON.parse(messageObject["content"])
+                    console.log(messageObject)
+
+                    if (textBot["intent"] === "chat") {
+                        addMessage(textBot["text"], "bot-message");
+                    }
+                    else if (textBot["intent"] === "cart") {
+                        console.log(textBot["payload"]);
+                        addMessage(textBot["text"], "bot-message");
+                    } else if (textBot["intent"] === "submit") {
+                        console.log(textBot["payload"]);
+                        addMessage(textBot["text"], "bot-message");
+                    }
                 } catch (error) {
                     console.error("Error parsing server JSON:", error);
                 }
