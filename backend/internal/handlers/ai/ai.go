@@ -18,10 +18,12 @@ import (
 )
 
 type ParsedRequest struct {
-	Intent  string `json:"intent"`
-	Text    string `json:"text"`
-	Payload string `json:"payload"`
+	Intent  string  `json:"intent"`
+	Text    string  `json:"text"`
+	Payload Payload `json:"payload"`
 }
+
+type Payload interface{}
 
 type EmptyPayload struct{}
 
@@ -76,26 +78,49 @@ func processParseResult(parseResult string, session *chat.ChatSession) chat.Mess
 	jsonText = strings.ReplaceAll(jsonText, "```json", "")
 	jsonText = strings.ReplaceAll(jsonText, "```", "")
 
-	var parsed ParsedRequest
-
-	err := json.Unmarshal([]byte(jsonText), &parsed)
-
-	if err != nil {
-		return chat.Message{Status: http.StatusInternalServerError, Content: "500 INTERNAL SERVER ERROR: " + err.Error() + "\n FAULTY ASS JSON: " + jsonText}
+	var raw_parsed struct {
+		Intent  string          `json:"intent"`
+		Text    string          `json:"text"`
+		Payload json.RawMessage `json:"payload"`
 	}
 
-	log.Println("PARSEREQUEST: %v", parsed)
+	var parsed ParsedRequest
+
+	err := json.Unmarshal([]byte(jsonText), &raw_parsed)
+
+	if err != nil {
+		log.Println(err.Error())
+		return chat.Message{Status: http.StatusInternalServerError, Content: jsonText}
+	}
+
+	parsed.Intent = raw_parsed.Intent
+	parsed.Text = raw_parsed.Text
+
+	log.Println("PARSEREQUEST: ", parsed)
+	log.Println("RAW PARSEREQ: ", jsonText)
 
 	switch parsed.Intent {
 	case "chat":
 	case "products":
-	case "cart":
-		var cart_payload CartPayload
-		err := json.Unmarshal([]byte(parsed.Payload), &cart_payload)
+		var products_payload ProductsPayload
+		err := json.Unmarshal(raw_parsed.Payload, &products_payload)
 
 		if err != nil {
-			return chat.Message{Status: http.StatusInternalServerError, Content: "500 INTERNAL SERVER ERROR: " + err.Error() + "\n FAULTY ASS JSON: " + jsonText}
+			log.Println(err.Error())
+			return chat.Message{Status: http.StatusInternalServerError, Content: jsonText}
 		}
+
+		parsed.Payload = products_payload
+	case "cart":
+		var cart_payload CartPayload
+		err := json.Unmarshal(raw_parsed.Payload, &cart_payload)
+
+		if err != nil {
+			log.Println(err.Error())
+			return chat.Message{Status: http.StatusInternalServerError, Content: jsonText}
+		}
+
+		parsed.Payload = cart_payload
 
 		log.Println("STRING PAYLOAD: %v", parsed.Payload)
 		log.Println("CART PAYLOAD: %v", cart_payload)
@@ -128,12 +153,12 @@ func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context
 		{
 			"intent": "chat",
 			"text": "Hey, it's me!",
-			"payload": "{...}"
+			"payload": {...}
 		}
 
 		intent corrects your behaviour
 		text is your regular reply
-		payload is a string of a valid json
+		payload is a valid json
 
 		Database contains products, storages and stock, containing info about products in storages
 
@@ -163,13 +188,13 @@ func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context
 
 		Possible intents:
 		- chat.
-			Payload example: "{}"
+			Payload example: {}
 
 		- products. User wants to see the products.
-			Payload example: "{"products": [
+			Payload example: {"products": [
 					{"product_id": 1, "product_name": "Продукт 1", category: "Категория 1", "price": 12.3},
 					{"product_id": 2, "product_name": "Продукт 2", category: "Категория 2", "price": 45.6}
-				]}"
+				]}
 
 			Rules:
 			- Help the client choose products
@@ -178,11 +203,11 @@ func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context
 
 		- cart. User wants to make changes to cart. Add, remove or change quantity. You should generate a new cart according to user's action.
 
-		Payload example: "{"cart": [
+		Payload example: {"cart": [
 					{"product_id": 1, "product_name": "Продукт 1", "price": 12.3, "storage_address": "г. Алматы, Сатпаева 101", "quantity": 3},
 					{"product_id": 2, "product_name": "Продукт 2", "price": 45.6, "storage_address": "г. Алматы, Абая 44", "quantity": 4}
 				],
-				"total_cost": 219,3}"
+				"total_cost": 219,3}
 
 			Rules:
 			- total cost is a sum of quantity*price
@@ -190,8 +215,8 @@ func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context
 			- set 1 by default
 			- if user writes "a couple", "few", "pair", "пару" -> quantity = 2
 
-		- submit. User submits the order.
-			Payload example: "{}"
+		- submit. User submits the order and it's getting processed.
+			Payload example: {}
 
 			Rules:
 			- Check if cart is not empty before switching to "submit" intent.
@@ -206,16 +231,20 @@ func ParseToAI(message chat.Message, client *openai.Client, ctx *context.Context
 	parsedResult, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: "qwen/qwen3-coder-480b-a35b-instruct",
+			Model: "qwen/qwen3-next-80b-a3b-instruct",
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleUser,
 					Content: basePrompt,
 				},
 			},
-			Temperature: 0.6,
+			Temperature: 0.3,
 			TopP:        0.75,
-			MaxTokens:   8192,
+			MaxTokens:   300,
+			Stop:        []string{"```", "\n\n\n"},
+			ResponseFormat: &openai.ChatCompletionResponseFormat{
+				Type: openai.ChatCompletionResponseFormatTypeJSONObject,
+			},
 		},
 	)
 

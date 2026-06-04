@@ -49,6 +49,8 @@ func OnConnect(c *gin.Context) {
 		}
 
 		serverMsg := ai.ParseToAI(incomingMessage, client, &ctx, c)
+		// serverMsg := chat.Message{Content: "{\"intent\": \"cart\", \"text\": \"YOOFDGODFOG\", \"payload\": \"{\\\"cart\\\": [{\\\"product_id\\\": 1, \\\"product_name\\\": \\\"sdfsdf\\\", \\\"price\\\": 123.32, \\\"storage_address\\\": \\\"dsfsdf\\\", \\\"quantity\\\": 4}], \\\"total_cost\\\": 54.34}\"}", Status: 200}
+		// serverMsg := chat.Message{Content: "{\"intent\": \"products\", \"text\": \"YOOFDGODFOG\", \"payload\": \"{\\\"products\\\": [{\\\"product_id\\\": 1, \\\"product_name\\\": \\\"sdfsdf\\\", \\\"category\\\": \\\"CATEGORY\\\", \\\"price\\\": 123.32}]}\"}", Status: 200}
 
 		if err := conn.WriteJSON(serverMsg); err != nil {
 			log.Printf("Ошибка записи JSON: %v", err)

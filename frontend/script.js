@@ -12,12 +12,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const quickButtons = document.querySelectorAll(".quick-questions button");
 
     let socket = null;
+    let cart = {"cart": [], "total_cost": 0.0};
 
     openChatBtn.onclick = function (event) {
         event.stopPropagation();
 
         if (!socket || socket.readyState === WebSocket.CLOSED) {
-            socket = new WebSocket("ws://localhost:8080/api/v1/ws/chat");
+        socket = new WebSocket("ws://localhost:8080/api/v1/ws/chat");
 
             socket.onopen = () => {
                 console.log("Connected to chat!");
@@ -27,28 +28,66 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 try {
                     const messageObject = JSON.parse(e.data);
-                    const textBot = JSON.parse(messageObject["content"])
-                    console.log(messageObject)
+
+                    console.log(messageObject);
+
+                    let content = messageObject.content;
+
+                    // safe parse
+                    if (typeof content === "string") {
+                        content = content
+                            .replace(/```json/g, "")
+                            .replace(/```/g, "")
+                            .replace("\\\"", "\"")
+                            .trim();
+
+                        console.log(content);
+
+                        content = JSON.parse(content);
+                    }
+
+                    const textBot = content;
+                    // console.log("tesdf: ", textBot);
+                    // console.log("tesdf: ", textBot.intent);
 
                     if (textBot["intent"] === "chat") {
                         addMessage(textBot["text"], "bot-message");
                     }
+                    else if (textBot["intent"] === "products") {
+                        console.log(textBot["payload"]);
+
+                        const products_payload = textBot["payload"]
+                        console.log(products_payload)
+
+                        addMessage(textBot["text"], "bot-message");
+
+                        for (let item of products_payload["products"]) {
+                            addProductCard(item["product_name"], item["price"]);
+                        }
+                    }
                     else if (textBot["intent"] === "cart") {
                         console.log(textBot["payload"]);
+
+                        const cart_payload = textBot["payload"]
+                        console.log(cart_payload)
+
                         addMessage(textBot["text"], "bot-message");
+
+                        cart = cart_payload
+
+                        showCart(cart_payload);
                     } else if (textBot["intent"] === "submit") {
                         console.log(textBot["payload"]);
                         addMessage(textBot["text"], "bot-message");
+
+                        cart = {"cart": [], "total_cost": 0.0}
                     }
                 } catch (error) {
                     console.error("Error parsing server JSON:", error);
                 }
             }
             socket.onerror = (err) => console.error("Socket error:", err);
-            socket.onclose = () => {
-                console.log("Chat connection closed.");
-                socket.close();
-            }
+            socket.onclose = () => console.log("Chat connection closed.");
         }
 
         chatWindow.style.display = "flex";
@@ -93,10 +132,20 @@ document.addEventListener("DOMContentLoaded", function () {
         if (text === "") {
             return;
         }
-
+        
         addMessage(text, "user-message");
 
         messageInput.value = "";
+
+        if (text.toLowerCase() === "карточка") {
+            addProductCard(1);
+            return;
+        }
+        
+        if (text.toLowerCase() === "карточка2") {
+            addProductCard(2);
+            return;
+        }
         
         const userMessage = {
             timestamp: Date.now,
@@ -123,13 +172,206 @@ document.addEventListener("DOMContentLoaded", function () {
     quickButtons.forEach(function (button) {
         button.onclick = function () {
             const text = button.textContent.trim();
-
+    
+            if (text === "Корзина") {
+                showCart(cart);
+                return;
+            }
+    
             addMessage(text, "user-message");
-
+    
             setTimeout(function () {
                 addMessage("Вы выбрали: " + text, "bot-message");
             }, 500);
         };
     });
+
+    /// @prudct_name string
+    /// @product_price float
+    function addProductCard(product_name, product_price) {
+        const card = document.createElement("div");
+        card.classList.add("product-card");
+    
+        card.innerHTML = `
+            <div class="product-content">
+                <div class="product-title">${product_name}</div>
+    
+                <div class="product-bottom">
+                    <div class="product-price">
+                        Цена: ${product_price} ₸
+                    </div>
+                </div>
+            </div>
+        `;
+    
+        chatMessages.appendChild(card);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function addCartProductTotalPrice(price) {
+        const label = document.createElement("div");
+        label.classList.add("product-card");
+
+        label.innerHTML = `
+            <div class="product-content">
+                <div class="product-price">
+                    Итоговая цена: ${price} ₸
+                </div>
+            </div>
+        `;
+
+        chatMessages.appendChild(label);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // function addToCart(product) {
+    //     const existingProduct = cart.find(function (item) {
+    //         return item.id === product.id;
+    //     });
+    
+    //     if (existingProduct) {
+    //         existingProduct.quantity++;
+    //     } else {
+    //         cart.push({
+    //             ...product,
+    //             quantity: 1
+    //         });
+    //     }
+    
+    //     addMessage("Товар добавлен в корзину", "bot-message");
+    // }
+
+    function showCart(cart_payload) {
+
+        let order_list = cart_payload["cart"];
+
+        const cartWindow = document.createElement("div");
+        cartWindow.classList.add("cart-window");
+    
+        if (order_list.length === 0) {
+            cartWindow.innerHTML = `
+                <div class="cart-title">Корзина</div>
+                <div class="cart-empty">Корзина пока пустая</div>
+            `;
+        } else {
+            let total = 0;
+    
+            let itemsHtml = order_list.map(function (item) {
+                total += item.price * item.quantity;
+    
+                return `
+                <div class="cart-item">
+            
+                    <div class="cart-main">
+            
+                        <div>
+                            <div class="cart-product-name">
+                                ${item.product_name}
+                            </div>
+            
+                            <div class="cart-product-price">
+                                ${item.price} ₸ × ${item.quantity}
+                            </div>
+                        </div>
+            
+                        <div class="cart-location-wrap">
+                            <button class="cart-details-btn">
+                                <img src="geo2.svg" class="details-icon">
+                            </button>
+            
+                            <div class="cart-details">
+                                 ${item.storage_address}
+                            </div>
+                        </div>
+            
+                    </div>
+            
+                </div>
+            `;
+    
+            }).join("");
+    
+            cartWindow.innerHTML = `
+                <div class="cart-title">Корзина</div>
+                ${itemsHtml}
+                <div class="cart-total">
+                    Итоговая цена: ${cart_payload["total_cost"]} ₸
+                </div>
+            `;
+
+        // for (let item of cart_payload["cart"]) {
+        //     addProductCard(item["product_name"], item["price"]);
+        // }
+        // addCartProductTotalPrice(cart_payload["total_cost"]);
+    }
+    
+    // function showCart() {
+    //     const oldCart = document.querySelector(".cart-window");
+    
+    //     if (oldCart) {
+    //         oldCart.remove();
+    //     }
+    
+    //     const cartWindow = document.createElement("div");
+    //     cartWindow.classList.add("cart-window");
+    
+    //     if (cart.length === 0) {
+    //         cartWindow.innerHTML = `
+    //             <div class="cart-title">Корзина</div>
+    //             <div class="cart-empty">Корзина пока пустая</div>
+    //         `;
+    //     } else {
+    //         let total = 0;
+    
+    //         let itemsHtml = cart.map(function (item) {
+    //             total += item.price * item.quantity;
+    
+    //             return `
+    //             <div class="cart-item">
+            
+    //                 <div class="cart-main">
+            
+    //                     <div>
+    //                         <div class="cart-product-name">
+    //                             ${item.name}
+    //                         </div>
+            
+    //                         <div class="cart-product-price">
+    //                             ${item.price} ₸ × ${item.quantity}
+    //                         </div>
+    //                     </div>
+            
+    //                     <div class="cart-location-wrap">
+    //                         <button class="cart-details-btn">
+    //                             <img src="geo2.svg" class="details-icon">
+    //                         </button>
+            
+    //                         <div class="cart-details">
+    //                              ${item.address}
+    //                         </div>
+    //                     </div>
+            
+    //                 </div>
+            
+    //             </div>
+    //         `;
+    
+    //         }).join("");
+    
+    //         cartWindow.innerHTML = `
+    //             <div class="cart-title">Корзина</div>
+    //             ${itemsHtml}
+    //             <div class="cart-total">
+    //                 Итоговая цена: ${total} ₸
+    //             </div>
+    //         `;
+    //     }
+    
+        chatMessages.appendChild(cartWindow);
+    
+    
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
 
 });
