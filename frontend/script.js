@@ -14,11 +14,30 @@ document.addEventListener("DOMContentLoaded", function () {
     let socket = null;
     let cart = {"cart": [], "total_cost": 0.0};
 
+    // Stable per-browser id so each visitor gets their own server-side session
+    // (history + cart) instead of everyone sharing the hardcoded "user123".
+    let userId = localStorage.getItem("chatUserId");
+    if (!userId) {
+        userId = "user-" + Math.random().toString(36).slice(2) + "-" + Date.now();
+        localStorage.setItem("chatUserId", userId);
+    }
+
+    // Derive the WebSocket URL from the page origin so it works regardless of
+    // host/port instead of being pinned to localhost:8080. Falls back to the Go
+    // dev server when the widget is opened directly from the filesystem.
+    function chatSocketUrl() {
+        if (location.protocol === "http:" || location.protocol === "https:") {
+            const proto = location.protocol === "https:" ? "wss:" : "ws:";
+            return proto + "//" + location.host + "/api/v1/ws/chat";
+        }
+        return "ws://localhost:8080/api/v1/ws/chat";
+    }
+
     openChatBtn.onclick = function (event) {
         event.stopPropagation();
 
         if (!socket || socket.readyState === WebSocket.CLOSED) {
-        socket = new WebSocket("ws://localhost:8080/api/v1/ws/chat");
+        socket = new WebSocket(chatSocketUrl());
 
             socket.onopen = () => {
                 console.log("Connected to chat!");
@@ -114,6 +133,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 Здравствуйте! Чем я могу помочь?
             </div>
         `;
+        // Reset the local cart view so a cleared chat starts from a clean slate.
+        cart = {"cart": [], "total_cost": 0.0};
     };
 
     sendBtn.onclick = function () {
@@ -148,10 +169,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         
         const userMessage = {
-            timestamp: Date.now,
+            // RFC3339 string — the Go backend's time.Time field rejects a raw
+            // numeric timestamp. (The server overwrites it server-side anyway.)
+            timestamp: new Date().toISOString(),
             messageType: "wh_message",
             content: text,
-            sender: "user123",
+            sender: userId,
             status: 200
         };
 
@@ -244,6 +267,13 @@ document.addEventListener("DOMContentLoaded", function () {
     function showCart(cart_payload) {
 
         let order_list = cart_payload["cart"];
+
+        // Remove any previously rendered cart so repeated "Корзина" clicks don't
+        // stack duplicate cart windows.
+        const oldCart = chatMessages.querySelector(".cart-window");
+        if (oldCart) {
+            oldCart.remove();
+        }
 
         const cartWindow = document.createElement("div");
         cartWindow.classList.add("cart-window");

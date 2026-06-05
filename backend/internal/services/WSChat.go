@@ -29,7 +29,15 @@ func OnConnect(c *gin.Context) {
 
 	ctx := context.Background()
 
-	client := ai.ConnectToAI(ctx)
+	client, err := ai.ConnectToAI(ctx)
+	if err != nil {
+		log.Printf("AI client unavailable: %v", err)
+		_ = conn.WriteJSON(chat.Message{
+			Status:  http.StatusServiceUnavailable,
+			Content: "AI assistant is not configured: " + err.Error(),
+		})
+		return
+	}
 
 	for {
 		var incomingMessage chat.Message

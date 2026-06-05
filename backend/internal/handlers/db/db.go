@@ -2,25 +2,87 @@ package db
 
 import (
 	"customer_managment_system/internal/models"
-	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
-func ConnectMockup() *sqlx.DB {
-	db, err := sqlx.Connect("sqlite3", "internal/handlers/db/mockup.db")
-	if err != nil {
-		log.Fatalln("cannot prodide sql conntection: ", err)
+var (
+	dbOnce     sync.Once
+	dbInstance *sqlx.DB
+	dbInitErr  error
+)
+
+// resolveDBPath locates mockup.db robustly: honours the DB_PATH env var, then
+// walks up from both the executable directory and the working directory looking
+// for the database. This makes the server runnable from any directory instead
+// of only from backend/.
+func resolveDBPath() string {
+	if p := os.Getenv("DB_PATH"); p != "" {
+		return p
 	}
-	return db
+
+	const maxLevels = 6
+	rel := filepath.Join("internal", "handlers", "db")
+	const marker = "mockup.db"
+
+	var starts []string
+	if exe, err := os.Executable(); err == nil {
+		starts = append(starts, filepath.Dir(exe))
+	}
+	if wd, err := os.Getwd(); err == nil {
+		starts = append(starts, wd)
+	}
+
+	for _, start := range starts {
+		dir := start
+		for i := 0; i < maxLevels; i++ {
+			// Either the full backend layout, or mockup.db sitting next to a dir.
+			if _, err := os.Stat(filepath.Join(dir, rel, marker)); err == nil {
+				return filepath.Join(dir, rel, marker)
+			}
+			if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+				return filepath.Join(dir, marker)
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+	// Nothing found; return the conventional path so the error message is clear.
+	return filepath.Join(rel, marker)
+}
+
+// ConnectMockup returns a process-wide shared *sqlx.DB. The connection is opened
+// once (lazily) and reused; sqlx/database-sql is safe for concurrent use, so this
+// avoids opening and closing a fresh handle on every request.
+func ConnectMockup() (*sqlx.DB, error) {
+	dbOnce.Do(func() {
+		path := resolveDBPath()
+		dbInstance, dbInitErr = sqlx.Connect("sqlite", path)
+		if dbInitErr != nil {
+			log.Printf("cannot open sqlite database at %q: %v", path, dbInitErr)
+		}
+	})
+	return dbInstance, dbInitErr
 }
 
 // CREATING TABLES AND MOCKUP DATA
 func GenerateMockUpData() {
 
-	db := ConnectMockup()
+	db, err := ConnectMockup()
+	if err != nil {
+		return
+	}
 
 	_, exec_err := db.Exec(`
 		INSERT INTO Storages (storage_id, address) VALUES
@@ -109,75 +171,129 @@ WHERE p.product_id <= 130  -- Исключаем последние 20 това�
 	if exec_err != nil {
 		log.Printf("Query failed: %v", exec_err)
 	}
-
-	db.Close()
 }
 
 func LoadOrderToDb(orders []models.Order) {
-	db := ConnectMockup()
-
-	_, err := db.NamedExec(`INSERT INTO Orders (order_date, product_name, storage_address, quantity, cost) 
-		VALUES (CURRENT_TIMESTAMP, :product_name, :storage_address, :quantity, :cost)`, orders)
-
-	if err != nil {
-		log.Println(err.Error())
+	if len(orders) == 0 {
+		return
 	}
 
-	db.Close()
+	db, err := ConnectMockup()
+	if err != nil {
+		return
+	}
+
+	if _, err := db.NamedExec(`INSERT INTO Orders (order_date, product_name, storage_address, quantity, cost)
+		VALUES (CURRENT_TIMESTAMP, :product_name, :storage_address, :quantity, :cost)`, orders); err != nil {
+		log.Println(err.Error())
+	}
 }
 
 func GetProducts() []models.Product {
-	db := ConnectMockup()
+	db, err := ConnectMockup()
+	if err != nil {
+		return nil
+	}
 
 	var result []models.Product
 
-	err := db.Select(&result, `SELECT * FROM Products`)
-
-	if err != nil {
+	if err := db.Select(&result, `SELECT * FROM Products`); err != nil {
 		log.Println(err.Error())
 	}
-
-	db.Close()
 
 	return result
 }
 
 func GetStorages() []models.Storage {
-	db := ConnectMockup()
+	db, err := ConnectMockup()
+	if err != nil {
+		return nil
+	}
 
 	var result []models.Storage
 
-	err := db.Select(&result, `SELECT * FROM Storages`)
-
-	if err != nil {
+	if err := db.Select(&result, `SELECT * FROM Storages`); err != nil {
 		log.Println(err.Error())
 	}
-
-	db.Close()
 
 	return result
 }
 
 func GetStocks() []models.Stock {
-	db := ConnectMockup()
+	db, err := ConnectMockup()
+	if err != nil {
+		return nil
+	}
 
 	var result []models.Stock
 
-	err := db.Select(&result, `SELECT * FROM Stock`)
-
-	if err != nil {
+	if err := db.Select(&result, `SELECT * FROM Stock`); err != nil {
 		log.Println(err.Error())
 	}
-
-	db.Close()
 
 	return result
 }
 
+// GetSchemaString renders the catalog for the LLM prompt in a compact,
+// token-efficient form. The previous implementation dumped full JSON (repeating
+// every key and quote on all ~380 rows), which cost ~11k prompt tokens per
+// message. A TSV layout plus a category legend conveys the same data in roughly
+// half the tokens, which directly cuts prefill latency.
 func GetSchemaString() string {
-	products, _ := json.Marshal(GetProducts())
-	storages, _ := json.Marshal(GetStorages())
-	stocks, _ := json.Marshal(GetStocks())
+	products := GetProducts()
+	storages := GetStorages()
+	stocks := GetStocks()
 
-	return `Products: ` + string(products) + `\n Storages: ` + string(storages) + `\n Stock: ` + string(stocks)
+	// Build a category legend so long category names are not repeated on every
+	// product row; products reference the short category id instead.
+	catIDs := map[string]int{}
+	var catNames []string
+	for _, p := range products {
+		if _, ok := catIDs[p.Category]; !ok {
+			catIDs[p.Category] = len(catNames)
+			catNames = append(catNames, p.Category)
+		}
+	}
+
+	var b strings.Builder
+
+	b.WriteString("Categories (id=name):\n")
+	for id, name := range catNames {
+		fmt.Fprintf(&b, "%d=%s\n", id, name)
+	}
+
+	b.WriteString("\nProducts (TSV: product_id, category_id, price, product_name):\n")
+	for _, p := range products {
+		fmt.Fprintf(&b, "%d\t%d\t%g\t%s\n", p.Id, catIDs[p.Category], p.Price, p.Name)
+	}
+
+	b.WriteString("\nStorages (TSV: storage_id, address):\n")
+	for _, s := range storages {
+		fmt.Fprintf(&b, "%d\t%s\n", s.Id, s.Address)
+	}
+
+	// Collapse Stock into one line per product: which storages hold it. The exact
+	// per-storage quantity is not needed for recommending products or resolving a
+	// storage address, so omitting it saves a large number of tokens.
+	storagesByProduct := map[int][]int{}
+	for _, st := range stocks {
+		storagesByProduct[st.ProductID] = append(storagesByProduct[st.ProductID], st.StorageID)
+	}
+	productIDs := make([]int, 0, len(storagesByProduct))
+	for pid := range storagesByProduct {
+		productIDs = append(productIDs, pid)
+	}
+	sort.Ints(productIDs)
+
+	b.WriteString("\nStock (product_id -> storage_ids that have it in stock):\n")
+	for _, pid := range productIDs {
+		ids := storagesByProduct[pid]
+		parts := make([]string, len(ids))
+		for i, id := range ids {
+			parts[i] = fmt.Sprintf("%d", id)
+		}
+		fmt.Fprintf(&b, "%d -> %s\n", pid, strings.Join(parts, ","))
+	}
+
+	return b.String()
 }
