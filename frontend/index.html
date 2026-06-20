@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Widget</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <button id="openChat" class="chat-toggle">
+        💬
+    </button>
+
+    <div id="chat" class="chat-window">
+
+        <div class="chat-header">
+            <div>
+                <h3>Консультант ASEM</h3>
+                <p>AI помощник</p>
+            </div>
+
+            <div class="header-actions">
+
+                <button id="clearChat"
+                         class="icon-btn">
+
+                    <img src="trash.svg"
+                       alt="trash">
+
+                </button>
+
+            
+                <button id="closeChat"
+                        class="icon-btn close-icon">
+            
+                    ✕
+            
+                </button>
+            
+            </div>
+        </div>
+
+        <div id="messages" class="chat-body">
+            <div class="bot-message">
+                Здравствуйте! Чем я могу помочь?
+            </div>
+        </div>
+
+        <div class="quick-questions">
+            <button>Узнать цену</button>
+            <button>Связаться</button>
+            <button>Корзина</button>
+        </div>
+        <div class="chat-input">
+            <input id="messageInput" type="text" placeholder="Введите сообщение...">
+            <button id="sendBtn" class="send-btn">
+
+                <img src="send.svg"
+                     alt="send">
+            
+            </button>
+        </div>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>

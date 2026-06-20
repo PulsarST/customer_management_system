@@ -1,25 +1,21 @@
 package routers
 
 import (
-	"net/http"
+	"customer_managment_system/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-func start_message(c gin.Context) {
+func RegisterSiteRoutes(rg *gin.RouterGroup) {
+	database_routes := rg.Group("/data")
+	{
+		database_routes.GET("/products", services.GetProducts)
+		database_routes.GET("/storages", services.GetStorages)
+		database_routes.GET("/stocks", services.GetStocks)
+	}
 
-}
-
-// chat/:msg
-func get_user_message(c gin.Context) {
-	message := c.Param("msg")
-	c.JSON(http.StatusOK, gin.H{
-		"message": "got it",
-	})
-
-}
-
-// asem/db/...
-func get_db_products(c gin.Context) {
-
+	websocket_routes := rg.Group("/ws")
+	{
+		websocket_routes.GET("/chat", services.OnConnect)
+	}
 }
